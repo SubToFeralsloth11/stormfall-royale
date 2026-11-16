@@ -657,7 +657,7 @@ func _sample_swing(keys: Array, x: float) -> Dictionary:
 	var u := clampf((x - a[0]) / (b[0] - a[0]), 0.0, 1.0)
 	# fast strike, eased wind-up / recovery
 	u = u * u * (3.0 - 2.0 * u) if i != 1 else 1.0 - pow(1.0 - u, 3.0)
-	var handle: Vector3 = (a[2] as Vector3).normalized().slerp((b[2] as Vector3).normalized(), u)
+	var handle: Vector3 = (a[2] as Vector3).normalized().lerp((b[2] as Vector3).normalized(), u).normalized()
 	var pos: Vector3 = (a[1] as Vector3).lerp(b[1], u)
 	var blade := (pos - (a[1] as Vector3)).normalized() if i in [1, 2] else Vector3(0, 0, -1)
 	blade = (blade - handle * blade.dot(handle))
@@ -698,8 +698,8 @@ func _apply_ik(targets: Dictionary, delta: float) -> void:
 			else:
 				var kk := 1.0 if swing_t >= 0.0 and hold == "pickaxe" and side == "r" else k
 				store.pos = (store.pos as Vector3).lerp(p, kk)
-				store.fwd = (store.fwd as Vector3).slerp(f, kk).normalized()
-				store.up = (store.up as Vector3).slerp(u, kk).normalized()
+				store.fwd = (store.fwd as Vector3).lerp(f, kk).normalized()
+				store.up = (store.up as Vector3).lerp(u, kk).normalized()
 		if store.is_empty():
 			continue
 		_solve_arm(side == "r", chest, store.pos, store.fwd, store.up, w)

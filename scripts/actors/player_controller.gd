@@ -17,6 +17,11 @@ var _interact_hold := 0.0
 var _fov := 80.0
 
 var hud: Hud
+var editing: Structures.Destructible
+var _edit_mask := 0
+var _edit_paint := -1
+var _edit_overlay: MeshInstance3D
+var _ended := false
 
 
 func setup(g: Match, p: Pawn) -> void:
@@ -70,6 +75,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed:
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if editing and event.button_index == MOUSE_BUTTON_LEFT:
+			_edit_click(true)
+			return
+		if editing and event.button_index == MOUSE_BUTTON_RIGHT:
+			_edit_mask = 0
+			return
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			pawn.cycle_slot(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -77,7 +88,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("pause"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event.is_action_pressed("jump"):
-		pawn.jump()
+		if pawn.mode == Pawn.Mode.BUS:
+			game.eject(pawn)
+		else:
+			pawn.jump()
+	elif event.is_action_pressed("edit"):
+		_toggle_edit()
 	elif event.is_action_pressed("reload"):
 		pawn.start_reload()
 	elif event.is_action_pressed("build_wall"):
@@ -137,7 +153,11 @@ func _process(delta: float) -> void:
 	pawn.in_sprint = Input.is_action_pressed("sprint")
 	pawn.in_crouch = Input.is_action_pressed("crouch")
 	pawn.in_aim = Input.is_action_pressed("aim") and captured
-	pawn.in_fire = Input.is_action_pressed("fire") and captured
+	pawn.in_fire = Input.is_action_pressed("fire") and captured and editing == null and not _ended
+	if _ended:
+		pawn.in_move = Vector2.ZERO
+	if editing:
+		_edit_update()
 	# recoil settles back
 	if _recoil > 0.0:
 		var back := minf(_recoil, delta * 0.25)
@@ -150,6 +170,14 @@ func _process(delta: float) -> void:
 
 
 func _update_camera(delta: float) -> void:
+	if pawn.mode == Pawn.Mode.BUS or (pawn.mode == Pawn.Mode.DEAD and not game.bus_done):
+		var bb := Basis.from_euler(Vector3(clampf(pawn.pitch, -1.2, 0.4), pawn.yaw, 0))
+		var bp := game.bus_position()
+		cam.global_transform = Transform3D(bb, bp + Vector3(0, 4, 0) + bb.z * 28.0)
+		cam.fov = 80.0
+		pawn.aim_from = cam.global_position
+		pawn.aim_dir = -bb.z
+		return
 	var gliding := pawn.mode in [Pawn.Mode.SKYDIVE, Pawn.Mode.GLIDE]
 	var aiming := pawn.in_aim and not pawn.build_mode and not pawn.current_weapon().is_empty()
 	var dist := 3.2
@@ -232,3 +260,178 @@ func _update_ghost() -> void:
 	_ghost.global_transform = Structures.piece_xf(t.kind, t.cell, t.dir)
 	var ok: bool = game.structures.can_place(t.kind, t.cell, t.dir) and pawn.mats[pawn.build_mat] >= Cfg.BUILD_COST
 	_ghost.material_override = _ghost_mat_ok if ok else _ghost_mat_bad
+
+
+func on_match_end() -> void:
+	_ended = true
+	_exit_edit()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+# ------------------------------------------------------------------ editing
+# G on one of your own builds opens a grid (3x3 wall, 2x2 floor). Click or drag
+# to select tiles, G again confirms; right click resets. Ramps rotate per click.
+
+func _toggle_edit() -> void:
+	if editing:
+		_confirm_edit()
+		return
+	if pawn.mode != Pawn.Mode.GROUND:
+		return
+	var hit := game.combat.ray(cam.global_position, cam.global_position + pawn.aim_dir * 9.0, [pawn.get_rid()], Cfg.L_BUILD)
+	if hit.is_empty() or not (hit.collider as Node).has_meta("dest"):
+		return
+	var d: Structures.Destructible = (hit.collider as Node).get_meta("dest")
+	if d.owner_id != pawn.id or d.kind == PieceMeshes.Kind.CONE:
+		return
+	if (hit.position as Vector3).distance_to(pawn.global_position) > 7.5:
+		return
+	editing = d
+	_edit_mask = d.edit
+	pawn.set_build_mode(false)
+	pawn.rig.hold = "build"
+	if _edit_overlay == null:
+		_edit_overlay = MeshInstance3D.new()
+		_edit_overlay.mesh = ImmediateMesh.new()
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.vertex_color_use_as_albedo = true
+		m.no_depth_test = true
+		_edit_overlay.material_override = m
+		_edit_overlay.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		game.add_child(_edit_overlay)
+	_edit_overlay.visible = true
+	Sfx.play("edit")
+
+
+func _confirm_edit() -> void:
+	if editing and editing.alive:
+		var full := 511 if editing.kind == PieceMeshes.Kind.WALL else 15
+		if editing.kind == PieceMeshes.Kind.RAMP:
+			game.structures.apply_edit(editing, 0, editing.dir)
+		elif _edit_mask != editing.edit and _edit_mask != full:
+			game.structures.apply_edit(editing, _edit_mask)
+	_exit_edit()
+
+
+func _exit_edit() -> void:
+	editing = null
+	_edit_paint = -1
+	if _edit_overlay:
+		_edit_overlay.visible = false
+	pawn._refresh_held()
+
+
+## Cell index under the crosshair, or -1.
+func _edit_cell() -> int:
+	var inv := editing.xf.affine_inverse()
+	var o: Vector3 = inv * cam.global_position
+	var dl: Vector3 = inv.basis * pawn.aim_dir
+	var T := Cfg.TILE
+	var L := Cfg.LEVEL
+	if editing.kind == PieceMeshes.Kind.WALL:
+		if absf(dl.z) < 0.001:
+			return -1
+		var t := -o.z / dl.z
+		if t < 0.0:
+			return -1
+		var p := o + dl * t
+		var col := floori(p.x / (T / 3.0))
+		var row := floori(p.y / (L / 3.0))
+		if col < 0 or col > 2 or row < 0 or row > 2:
+			return -1
+		return row * 3 + col
+	if editing.kind == PieceMeshes.Kind.FLOOR:
+		if absf(dl.y) < 0.001:
+			return -1
+		var t := -o.y / dl.y
+		if t < 0.0:
+			return -1
+		var p := o + dl * t
+		var i := floori(p.x / (T / 2.0))
+		var j := floori(p.z / (T / 2.0))
+		if i < 0 or i > 1 or j < 0 or j > 1:
+			return -1
+		return j * 2 + i
+	return 0
+
+
+func _edit_click(pressed: bool) -> void:
+	if not editing:
+		return
+	if editing.kind == PieceMeshes.Kind.RAMP:
+		if pressed:
+			editing_dir_cycle()
+		return
+	var c := _edit_cell()
+	if c < 0:
+		return
+	_edit_paint = 0 if (_edit_mask & (1 << c)) else 1
+	_apply_paint(c)
+
+
+func editing_dir_cycle() -> void:
+	game.structures.apply_edit(editing, 0, (editing.dir + 1) % 4)
+	Sfx.play("edit")
+
+
+func _apply_paint(c: int) -> void:
+	var before := _edit_mask
+	if _edit_paint == 1:
+		_edit_mask |= (1 << c)
+	else:
+		_edit_mask &= ~(1 << c)
+	if before != _edit_mask:
+		Sfx.play("edit", 1.3)
+
+
+func _edit_update() -> void:
+	if not editing.alive or editing.center.distance_to(pawn.global_position) > 9.0:
+		_exit_edit()
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _edit_paint >= 0:
+		var c := _edit_cell()
+		if c >= 0:
+			_apply_paint(c)
+	elif not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_edit_paint = -1
+	_draw_edit_grid()
+
+
+func _draw_edit_grid() -> void:
+	var im := _edit_overlay.mesh as ImmediateMesh
+	im.clear_surfaces()
+	var T := Cfg.TILE
+	var L := Cfg.LEVEL
+	var hover := _edit_cell()
+	var cells := []
+	if editing.kind == PieceMeshes.Kind.WALL:
+		for row in 3:
+			for col in 3:
+				var a := Vector3(T / 3.0 * col, L / 3.0 * row, 0.15)
+				cells.append([row * 3 + col, a, Vector3(T / 3.0, 0, 0), Vector3(0, L / 3.0, 0)])
+	elif editing.kind == PieceMeshes.Kind.FLOOR:
+		for j in 2:
+			for i in 2:
+				var a := Vector3(T / 2.0 * i, 0.15, T / 2.0 * j)
+				cells.append([j * 2 + i, a, Vector3(T / 2.0, 0, 0), Vector3(0, 0, T / 2.0)])
+	else:
+		cells.append([0, Vector3(0, 0.2, 0), Vector3(T, 0, 0), Vector3(0, L, T)])
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for c: Array in cells:
+		var sel := (_edit_mask & (1 << int(c[0]))) != 0 and editing.kind != PieceMeshes.Kind.RAMP
+		var col := Color(0.35, 0.75, 1.0, 0.18) if not sel else Color(0.2, 0.5, 1.0, 0.65)
+		if c[0] == hover and editing.kind != PieceMeshes.Kind.RAMP:
+			col = col.lightened(0.35)
+			col.a += 0.15
+		var a: Vector3 = c[1]
+		var u: Vector3 = c[2] * 0.94
+		var v: Vector3 = c[3] * 0.94
+		a += (c[2] as Vector3) * 0.03 + (c[3] as Vector3) * 0.03
+		var pts := [a, a + u, a + u + v, a + v]
+		for k: int in [0, 1, 2, 0, 2, 3]:
+			im.surface_set_color(col)
+			im.surface_add_vertex(editing.xf * (pts[k] as Vector3))
+	im.surface_end()

@@ -46,6 +46,7 @@ var _mat_cache := {}
 var _static_mat := MeshBuilder.vc_material(0.8)
 var _collapse_queue: Array = []  # [time, Destructible]
 var _time := 0.0
+var _wobbles := {}               # id -> [Destructible, t]  (batched props shake when hit)
 
 
 func _init(t: Terrain) -> void:
@@ -292,6 +293,20 @@ func _process(delta: float) -> void:
 		if d.hp >= d.max_hp:
 			d.building = false
 			_building.remove_at(i)
+	for id: int in _wobbles.keys():
+		var w: Array = _wobbles[id]
+		var d: Destructible = w[0]
+		w[1] += delta
+		if not d.alive:
+			_wobbles.erase(id)
+			continue
+		var k: float = w[1] / 0.35
+		if k >= 1.0:
+			batcher.set_instance_transform(d.batch, d.xf)
+			_wobbles.erase(id)
+			continue
+		var ang := sin(k * PI * 4.0) * (1.0 - k) * 0.06
+		batcher.set_instance_transform(d.batch, Transform3D(d.xf.basis.rotated(Vector3(1, 0, 0.6).normalized(), ang), d.xf.origin))
 	while not _collapse_queue.is_empty() and _collapse_queue[0][0] <= _time:
 		var item: Array = _collapse_queue.pop_front()
 		var d: Destructible = item[1]
@@ -306,6 +321,8 @@ func damage(d: Destructible, amount: float) -> bool:
 	d.hp -= amount
 	if d.mesh_inst and d.is_piece:
 		_shake(d)
+	elif d.batch >= 0 and not d.is_piece:
+		_wobbles[d.id] = [d, 0.0]
 	if d.hp <= 0.0:
 		destroy(d)
 		return true
