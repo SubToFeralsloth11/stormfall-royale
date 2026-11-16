@@ -15,10 +15,10 @@ const BONES := [
 	["chest", 2, Vector3(0, 0.2, 0)],
 	["neck", 3, Vector3(0, 0.2, 0)],
 	["head", 4, Vector3(0, 0.08, 0)],
-	["l_arm", 3, Vector3(-0.21, 0.15, 0)],
+	["l_arm", 3, Vector3(-0.24, 0.08, 0)],
 	["l_fore", 6, Vector3(0, -0.28, 0)],
 	["l_hand", 7, Vector3(0, -0.25, 0)],
-	["r_arm", 3, Vector3(0.21, 0.15, 0)],
+	["r_arm", 3, Vector3(0.24, 0.08, 0)],
 	["r_fore", 9, Vector3(0, -0.28, 0)],
 	["r_hand", 10, Vector3(0, -0.25, 0)],
 	["l_thigh", 1, Vector3(-0.1, -0.04, 0)],
@@ -197,12 +197,12 @@ static func _skin_mesh(i: int) -> ArrayMesh:
 	_head(mb, s)
 	# arms
 	for side: float in [-1.0, 1.0]:
-		var sh := Vector3(0.21 * side * w, 1.46, 0)
+		var sh := Vector3(0.24 * side * w, 1.39, 0)
 		var el := sh + Vector3(0.0, -0.28, 0)
 		var wr := el + Vector3(0, -0.25, 0)
 		var sleeve: Color = top if s.sleeves == "long" else skin
 		mb.bone = B_LARM if side < 0 else B_RARM
-		mb.sphere(sh, Vector3.ONE * 0.09 * w, 3, 8, top)
+		mb.sphere(sh + Vector3(-0.02 * side, 0.01, 0), Vector3(0.095, 0.08, 0.085) * w, 3, 8, top)
 		mb.limb(sh, el, 0.078 * w, 0.066 * w, sleeve if s.sleeves == "long" else skin, 8)
 		if s.sleeves == "short":
 			mb.cylinder(sh + Vector3(0, -0.1, 0), 0.1, 0.075 * w, 0.075 * w, 8, top, false)
@@ -384,8 +384,8 @@ static func _back(mb: MeshBuilder, s: Dictionary) -> void:
 
 const UPPER_LEN := 0.28
 const FORE_LEN := 0.25
-const SHOULDER_R := Vector3(0.21, 0.15, 0)
-const SHOULDER_L := Vector3(-0.21, 0.15, 0)
+const SHOULDER_R := Vector3(0.24, 0.08, 0)
+const SHOULDER_L := Vector3(-0.24, 0.08, 0)
 
 ## Pickaxe combo keys: [t, hand pos (chest frame), handle dir, torso twist, lean]
 const SWING_A := [

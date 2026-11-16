@@ -5,12 +5,12 @@ extends RefCounted
 static var _cache := {}
 
 
-static func get_mesh(kind: String, variant := 0) -> ArrayMesh:
-	var key := "%s_%d" % [kind, variant]
+static func get_mesh(kind: String, variant := 0, lod := 1.6) -> ArrayMesh:
+	var key := "%s_%d_%.1f" % [kind, variant, lod]
 	if _cache.has(key):
 		return _cache[key]
 	var mb := MeshBuilder.new()
-	MeshBuilder.detail = 1.6
+	MeshBuilder.detail = lod
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(key)
 	match kind:

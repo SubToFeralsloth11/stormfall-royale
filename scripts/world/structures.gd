@@ -32,6 +32,7 @@ class Destructible:
 	var body: StaticBody3D
 	var mesh_inst: MeshInstance3D
 	var batch := -1
+	var batch_far := -1          # optional low-detail far LOD instance
 	var alive := true
 	var center: Vector3:
 		get: return aabb.get_center()
@@ -250,7 +251,7 @@ static func _box_shape(body: StaticBody3D, pos: Vector3, size: Vector3) -> void:
 
 
 ## Props (trees, rocks, cars...) share the damage pipeline but not integrity.
-func add_prop(prop: String, mesh: Mesh, mat: Material, xf: Transform3D, col_shape: Shape3D, shape_xf: Transform3D, hp: float, harvest_mat: int, yield_per_hit: int, tint := Color.WHITE, vis_end := 1400.0, shadow := true) -> Destructible:
+func add_prop(prop: String, mesh: Mesh, mat: Material, xf: Transform3D, col_shape: Shape3D, shape_xf: Transform3D, hp: float, harvest_mat: int, yield_per_hit: int, tint := Color.WHITE, vis_end := 1400.0, shadow := true, far_mesh: Mesh = null, near_end := 0.0) -> Destructible:
 	var d := Destructible.new()
 	d.id = _next_id
 	_next_id += 1
@@ -276,7 +277,11 @@ func add_prop(prop: String, mesh: Mesh, mat: Material, xf: Transform3D, col_shap
 		add_child(body)
 		body.global_transform = xf
 		d.body = body
-	d.batch = batcher.add(prop, mesh, mat, xf, tint, vis_end, shadow)
+	if far_mesh:
+		d.batch = batcher.add(prop, mesh, mat, xf, tint, near_end, shadow)
+		d.batch_far = batcher.add(prop + "_far", far_mesh, mat, xf, tint, vis_end, false, near_end)
+	else:
+		d.batch = batcher.add(prop, mesh, mat, xf, tint, vis_end, shadow)
 	return d
 
 
@@ -347,6 +352,8 @@ func destroy(d: Destructible, check_integrity := true) -> void:
 		d.mesh_inst.queue_free()
 	if d.batch >= 0:
 		batcher.hide_instance(d.batch)
+	if d.batch_far >= 0:
+		batcher.hide_instance(d.batch_far)
 	if d.is_piece:
 		_slots.erase(d.key)
 		_unindex(d)

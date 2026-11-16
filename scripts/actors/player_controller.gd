@@ -65,7 +65,7 @@ func setup(g: Match, p: Pawn) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:   # _input: focused UI controls must not swallow game keys
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var sens := Cfg.mouse_sens * (Cfg.ads_sens_mult if pawn.in_aim and not pawn.build_mode else 1.0)
 		if _scoped():

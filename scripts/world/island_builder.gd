@@ -31,8 +31,9 @@ func _init(t: Terrain, s: Structures, l: Loot, seed_value: int) -> void:
 func build_all() -> void:
 	for i in Terrain.POIS.size():
 		_build_poi(i)
+	_scatter_outskirts()       # buildings first so trees avoid their footprints
+	_scatter_roadside()
 	_scatter_nature()
-	_scatter_outskirts()
 	_scatter_details()
 	st.batcher.finalize()
 
@@ -469,7 +470,9 @@ func _prop(kind: String, p: Vector2, collide := true) -> void:
 			vis = 300.0
 	if not collide:
 		shape = null
-	st.add_prop(kind, PropMeshes.get_mesh(kind, rng.randi() % 3), _prop_mat, xf, shape, sxf, hp, mat, yld, tint, vis, kind != "bush")
+	var variant := rng.randi() % 3
+	var far: Mesh = PropMeshes.get_mesh(kind, variant, 0.55) if kind in ["pine", "oak", "palm"] else null
+	st.add_prop(kind, PropMeshes.get_mesh(kind, variant), _prop_mat, xf, shape, sxf, hp, mat, yld, tint, vis, kind != "bush", far, 220.0)
 
 
 func _rock(p: Vector2, s: float, variant: int) -> void:
@@ -483,38 +486,86 @@ func _rock(p: Vector2, s: float, variant: int) -> void:
 
 
 func _scatter_nature() -> void:
-	var attempts := 26000
-	var placed := 0
-	for k in attempts:
+	# dense forest patches between POIs
+	var forests := 0
+	var tries := 0
+	while forests < 85 and tries < 600:
+		tries += 1
+		var c := Vector2(rng.randf_range(-1300, 1300), rng.randf_range(-1300, 1300))
+		if terrain.height_at(c.x, c.y) < 4.0 or terrain.poi_at(c) >= 0:
+			continue
+		forests += 1
+		var r := rng.randf_range(45.0, 130.0)
+		var pine_bias := 0.75 if terrain.height_at(c.x, c.y) > 40.0 else rng.randf_range(0.2, 0.7)
+		for k in int(r * r * 0.012):
+			var p := c + Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * r
+			_nature_at(p, pine_bias, 1.0)
+	# scattered trees, bushes and rocks everywhere else
+	for k in 30000:
 		var p := Vector2(rng.randf_range(-1450, 1450), rng.randf_range(-1450, 1450))
-		var h := terrain.height_at(p.x, p.y)
-		if h < 2.5:
-			if h > 0.5 and rng.randf() < 0.08:
-				_prop("palm", p)
-			continue
-		if terrain.poi_at(p) >= 0 or _occupied.has(_cell2(p)):
-			continue
-		var n := terrain.normal_at(p.x, p.y)
-		if n.y < 0.8:
-			if rng.randf() < 0.15:
-				_rock(p, rng.randf_range(1.0, 2.5), rng.randi() % 3)
-			continue
 		var forest := (terrain._noise.get_noise_2d(p.x * 2.0, p.y * 2.0) + 1.0) * 0.5
-		var roll := rng.randf()
-		if roll < forest * 0.55:
-			_prop("pine" if h > 45.0 or rng.randf() < 0.45 else "oak", p)
-			placed += 1
-		elif roll < forest * 0.55 + 0.12:
-			_prop("bush", p, false)
-		elif roll < forest * 0.55 + 0.16:
-			_rock(p, rng.randf_range(0.7, 1.8), rng.randi() % 3)
+		_nature_at(p, 0.45, forest * 0.5)
+
+
+func _nature_at(p: Vector2, pine_bias: float, tree_chance: float) -> void:
+	var h := terrain.height_at(p.x, p.y)
+	if h < 2.5:
+		if h > 0.5 and rng.randf() < 0.08:
+			_prop("palm", p)
+		return
+	if terrain.poi_at(p) >= 0 or _occupied.has(_cell2(p)):
+		return
+	var n := terrain.normal_at(p.x, p.y)
+	if n.y < 0.8:
+		if rng.randf() < 0.2:
+			_rock(p, rng.randf_range(1.0, 2.8), rng.randi() % 3)
+		return
+	var roll := rng.randf()
+	if roll < tree_chance * 0.6:
+		_prop("pine" if h > 45.0 or rng.randf() < pine_bias else "oak", p)
+	elif roll < tree_chance * 0.6 + 0.14:
+		_prop("bush", p, false)
+	elif roll < tree_chance * 0.6 + 0.18:
+		_rock(p, rng.randf_range(0.7, 1.8), rng.randi() % 3)
+
+
+## Utility poles, parked/abandoned cars, crates and hay along the roads.
+func _scatter_roadside() -> void:
+	for r: Array in Terrain.ROADS:
+		var a: Vector2 = Terrain.POIS[r[0]].pos
+		var b: Vector2 = Terrain.POIS[r[1]].pos
+		var dir := (b - a).normalized()
+		var side := Vector2(-dir.y, dir.x)
+		var length := a.distance_to(b)
+		var d := 40.0
+		while d < length - 40.0:
+			var p := a + dir * d
+			if terrain.poi_at(p) < 0 and terrain.height_at(p.x, p.y) > 1.5:
+				_prop("lamp", p + side * 7.0, true)
+				var roll := rng.randf()
+				if roll < 0.18:
+					_prop("car", p + side * rng.randf_range(-3.0, 3.0) + dir * 12.0, true)
+				elif roll < 0.3:
+					_prop("crate", p - side * 8.0, true)
+				elif roll < 0.42:
+					_prop("hay", p - side * rng.randf_range(10.0, 25.0), true)
+				elif roll < 0.5:
+					_prop("fence", p - side * 9.0, true)
+			d += rng.randf_range(35.0, 55.0)
+	# rock outcrops on hillsides
+	for k in 60:
+		var c := Vector2(rng.randf_range(-1300, 1300), rng.randf_range(-1300, 1300))
+		if terrain.height_at(c.x, c.y) < 6.0 or terrain.poi_at(c) >= 0:
+			continue
+		for j in rng.randi_range(3, 7):
+			_rock(c + Vector2(rng.randf_range(-12, 12), rng.randf_range(-12, 12)), rng.randf_range(1.2, 3.5), rng.randi() % 3)
 
 
 ## Lone farmhouses and loot along the countryside, like the unnamed spots in BR.
 func _scatter_outskirts() -> void:
 	var made := 0
 	var tries := 0
-	while made < 70 and tries < 2500:
+	while made < 140 and tries < 5000:
 		tries += 1
 		var p := Vector2(rng.randf_range(-1250, 1250), rng.randf_range(-1250, 1250))
 		var h := terrain.height_at(p.x, p.y)

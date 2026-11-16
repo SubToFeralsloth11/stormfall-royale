@@ -70,6 +70,7 @@ var last_hit_time := -100.0
 var _emote_t := -1.0
 var emote_id := -1
 var crouched := false
+var _jump_buffer := 0.0          # seconds a jump press stays queued for the physics step
 var dive := 0.0
 var glide_cooldown := 0.0
 var hit_flash := 0.0
@@ -241,6 +242,16 @@ func _ground(delta: float) -> void:
 			_land()
 		_airborne = false
 		velocity.y = minf(velocity.y, 0.0)
+		if _jump_buffer > 0.0:
+			_jump_buffer = 0.0
+			velocity.y = Cfg.JUMP_VELOCITY
+			_sliding = false
+			_set_crouch(false)
+			_airborne = true
+			_fall_peak = global_position.y
+			if is_player:
+				Sfx.play("jump")
+	_jump_buffer = maxf(0.0, _jump_buffer - delta)
 	var was_floor := on_floor
 	move_and_slide()
 	if was_floor and moving and on_floor:
@@ -257,12 +268,8 @@ func _ground(delta: float) -> void:
 
 
 func jump() -> void:
-	if mode == Mode.GROUND and is_on_floor() and _mantle_t < 0.0:
-		velocity.y = Cfg.JUMP_VELOCITY
-		_sliding = false
-		_set_crouch(false)
-		if is_player:
-			Sfx.play("jump")
+	if mode == Mode.GROUND and _mantle_t < 0.0 and (is_on_floor() or not _airborne or lite):
+		_jump_buffer = 0.15   # applied in _ground() so the floor clamp can't eat it
 	elif mode == Mode.GROUND and not is_on_floor() and _airborne:
 		_try_mantle(true)
 	elif mode == Mode.SWIM:

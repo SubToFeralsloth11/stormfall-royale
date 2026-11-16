@@ -11,6 +11,7 @@ class Group:
 	var xforms: Array[Transform3D] = []
 	var colors: Array[Color] = []
 	var vis_end := 1200.0
+	var vis_begin := 0.0
 	var shadow := true
 	var mmi: MultiMeshInstance3D
 
@@ -19,7 +20,7 @@ var _index := {}   # "key|cx|cz" -> group idx
 
 
 ## Returns a handle (group << 20 | instance).
-func add(key: String, mesh: Mesh, mat: Material, xf: Transform3D, color: Color, vis_end := 1200.0, shadow := true) -> int:
+func add(key: String, mesh: Mesh, mat: Material, xf: Transform3D, color: Color, vis_end := 1200.0, shadow := true, vis_begin := 0.0) -> int:
 	var cx := floori(xf.origin.x / CHUNK)
 	var cz := floori(xf.origin.z / CHUNK)
 	var gk := "%s|%d|%d" % [key, cx, cz]
@@ -31,6 +32,7 @@ func add(key: String, mesh: Mesh, mat: Material, xf: Transform3D, color: Color, 
 		g.mesh = mesh
 		g.mat = mat
 		g.vis_end = vis_end
+		g.vis_begin = vis_begin
 		g.shadow = shadow
 		gi = _groups.size()
 		_groups.append(g)
@@ -57,6 +59,7 @@ func finalize() -> void:
 		mmi.multimesh = mm
 		mmi.material_override = g.mat
 		mmi.visibility_range_end = g.vis_end
+		mmi.visibility_range_begin = g.vis_begin
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if g.shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mmi)
 		g.mmi = mmi

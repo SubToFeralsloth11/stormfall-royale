@@ -1,12 +1,13 @@
 class_name ItemIcons
 extends Node
-## Renders ItemMeshes into small offscreen SubViewports and caches the result
-## as ImageTextures (one render per id+rarity, shared across HUD instances).
-## get_icon() returns null until the icon is ready.
+## Renders ItemMeshes into small offscreen SubViewports, one per id+rarity,
+## rendered once and kept alive; the HUD draws their ViewportTextures directly.
+## (No GPU readback: get_image() on a live viewport crashed the Metal backend.)
+## get_icon() returns null until the icon has rendered.
 
 const SIZE := 128
 
-static var _cache := {}      # key -> ImageTexture
+var _cache := {}             # key -> ViewportTexture
 var _pending := {}           # key -> SubViewport
 
 
@@ -24,8 +25,8 @@ func _start(key: String, id: String, rarity: int) -> void:
 	vp.size = Vector2i(SIZE, SIZE)
 	vp.own_world_3d = true
 	vp.transparent_bg = true
-	vp.msaa_3d = Viewport.MSAA_4X
-	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp.msaa_3d = Viewport.MSAA_2X
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(vp)
 	var we := WorldEnvironment.new()
 	var e := Environment.new()
@@ -62,15 +63,9 @@ func _start(key: String, id: String, rarity: int) -> void:
 
 
 func _harvest(key: String, vp: SubViewport) -> void:
-	for i in 3:
-		await RenderingServer.frame_post_draw
-		if not is_instance_valid(vp):
-			_pending.erase(key)
-			return
-	var img := vp.get_texture().get_image()
-	if img != null and not img.is_empty():
-		_cache[key] = ImageTexture.create_from_image(img)
-	else:
-		_cache[key] = null      # headless / dummy renderer: HUD falls back to text
+	await RenderingServer.frame_post_draw
+	if not is_instance_valid(vp):
+		_pending.erase(key)
+		return
+	_cache[key] = vp.get_texture()
 	_pending.erase(key)
-	vp.queue_free()
