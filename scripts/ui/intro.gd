@@ -10,7 +10,7 @@ const SLAM_AT := 1.2
 const SLAM_TIME := 0.16
 const HOLD := 1.5
 const FADE := 0.3
-const STAMP_RED := Color(0.86, 0.08, 0.1)
+const STAMP_RED := Color(0.96, 0.12, 0.12)
 const STAMP_ANGLE := -12.0
 
 const INK_SHADER := """
@@ -24,7 +24,7 @@ void fragment() {
 	vec2 p = SCREEN_UV * vec2(1.7778, 1.0);
 	float g = texture(grain, p * 3.0).r;
 	float b = texture(blotch, p * 0.9).r;
-	float ink = mix(0.55, 1.0, smoothstep(0.25, 0.65, b));
+	float ink = mix(0.72, 1.0, smoothstep(0.25, 0.65, b));
 	ink *= smoothstep(0.18, 0.34, g);
 	COLOR = vec4(c.rgb, c.a * ink * 0.92);
 }
@@ -67,6 +67,10 @@ func _ready() -> void:
 	_stamp = Control.new()
 	_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stamp.draw.connect(_draw_stamp)
+	# CanvasGroup sizes its buffer from child rects, so the stamp needs a real
+	# rect around the origin it draws at
+	_stamp.size = Vector2(1100, 420)
+	_stamp.position = -_stamp.size * 0.5
 	_stamp_group.add_child(_stamp)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5
@@ -75,23 +79,19 @@ func _ready() -> void:
 		_splats.append([Vector2(cos(a) * rng.randf_range(260, 420), sin(a) * rng.randf_range(90, 170)), rng.randf_range(2.0, 7.0)])
 
 
-static func _noise_tex(seed_v: int, freq: float, size: int) -> NoiseTexture2D:
+## Generated synchronously so the ink mask exists the moment the stamp lands.
+static func _noise_tex(seed_v: int, freq: float, size: int) -> ImageTexture:
 	var n := FastNoiseLite.new()
 	n.seed = seed_v
 	n.frequency = freq
 	n.fractal_octaves = 3
-	var t := NoiseTexture2D.new()
-	t.noise = n
-	t.width = size
-	t.height = size
-	t.seamless = true
-	return t
+	return ImageTexture.create_from_image(n.get_seamless_image(size, size))
 
 
 func _input(event: InputEvent) -> void:
 	if _emitted:
 		return
-	var skip := (event is InputEventKey and event.pressed and not event.echo) \
+	var skip: bool = (event is InputEventKey and event.pressed and not event.echo) \
 		or (event is InputEventMouseButton and event.pressed) \
 		or (event is InputEventJoypadButton and event.pressed)
 	if skip:
@@ -188,6 +188,7 @@ func _draw_bg() -> void:
 
 
 func _draw_stamp() -> void:
+	_stamp.draw_set_transform(_stamp.size * 0.5)
 	var font := UiStyle.bold()
 	var size := 118
 	var txt := "TEMU EDITION"

@@ -34,6 +34,7 @@ const NAME_B := ["Panda", "Llama", "Falcon", "Noodle", "Badger", "Taco", "Comet"
 
 
 func _ready() -> void:
+	set_process(false)   # nothing to tick until the world exists
 	_setup_environment()
 	await get_tree().process_frame
 	terrain = Terrain.new()
@@ -57,6 +58,7 @@ func _ready() -> void:
 	_spawn_player()
 	_spawn_bots()
 	Sfx.loop("bus", 0.0)
+	set_process(true)
 	loaded.emit()
 
 

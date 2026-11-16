@@ -69,7 +69,7 @@ func _build_world() -> void:
 	# platform: chunky disc + glowing rim + a lower step
 	var mat := MeshBuilder.vc_material(0.5)
 	var mb := MeshBuilder.new()
-	mb.cylinder(Vector3(0, -0.5, 0), 0.5, 1.75, 1.6, 24, Color(0.2, 0.32, 0.75), true, Color(0.85, 0.88, 0.98))
+	mb.cylinder(Vector3(0, -0.5, 0), 0.5, 1.75, 1.6, 24, Color(0.2, 0.32, 0.75), true, Color(0.36, 0.48, 0.86))
 	mb.cylinder(Vector3(0, -0.85, 0), 0.35, 2.3, 2.15, 24, Color(0.14, 0.2, 0.55), true, Color(0.35, 0.45, 0.9))
 	var plat := MeshInstance3D.new()
 	plat.mesh = mb.build()
@@ -85,7 +85,7 @@ func _build_world() -> void:
 	rm.albedo_color = Color(0.4, 0.85, 1.0)
 	rm.emission_enabled = true
 	rm.emission = Color(0.35, 0.8, 1.0)
-	rm.emission_energy_multiplier = 3.0
+	rm.emission_energy_multiplier = 1.6
 	_ring.material_override = rm
 	_ring.position.y = -0.02
 	add_child(_ring)
@@ -108,7 +108,7 @@ func _build_world() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = 40.0
 	add_child(_cam)
-	_cam.look_at_from_position(Vector3(-0.9, 1.45, 5.2), Vector3(-0.9, 0.95, 0), Vector3.UP)
+	_cam.look_at_from_position(Vector3(1.1, 1.35, 5.0), Vector3(1.1, 0.95, 0), Vector3.UP)
 	_cam.current = true
 
 
@@ -161,7 +161,7 @@ func _process(delta: float) -> void:
 			_emote_left = 2.0 if rig.emote != 2 else 1.4
 	_ring.rotation.y += delta * 0.4
 	var rm: StandardMaterial3D = _ring.material_override
-	rm.emission_energy_multiplier = 2.5 + sin(_t * 2.0) * 0.8
+	rm.emission_energy_multiplier = 1.4 + sin(_t * 2.0) * 0.4
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -615,7 +615,7 @@ func _hand_targets(_use: bool, ph: float, speed: float, swing: Dictionary) -> Di
 				var bob := sin(ph * 2.0) * 0.03
 				out.r = {"pos": Vector3(0.2, -0.3 + bob, -0.18), "fwd": Vector3(-0.35, -0.55, -1.0), "up": Vector3(-0.3, 1, 0.2), "frame": "chest"}
 			else:
-				var r := Vector3(0.11, -0.05, -0.3) if ads else Vector3(0.16, -0.13, -0.27)
+				var r := Vector3(0.12, -0.05, -0.3) if ads else Vector3(0.22, -0.12, -0.26)
 				var grip := {"smg": 0.24, "shotgun": 0.38, "sniper": 0.42}.get(hold, 0.32) as float
 				out.r = {"pos": r + kick, "fwd": fwd, "up": up, "frame": "aim"}
 				out.l = {"pos": r + kick + Vector3(-0.03, -0.02, -grip), "fwd": Vector3(0.25, 0.3, -1), "up": Vector3(1, 0.3, 0), "frame": "aim"}

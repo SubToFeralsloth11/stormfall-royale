@@ -49,9 +49,12 @@ func _ready() -> void:
 	hud.push_kill("Bot 40 eliminated Bot 7 with Pump Shotgun")
 	hud.set_hint("[E] Open chest")
 	_fake_storm = true
-	while p.mode != Pawn.Mode.GROUND:
+	var t0 := Time.get_ticks_msec()
+	while p.mode != Pawn.Mode.GROUND and Time.get_ticks_msec() - t0 < 40000:
 		await get_tree().process_frame
-		if p.mode == Pawn.Mode.SKYDIVE and p.height_above_ground() > 200.0:
+		if p.mode == Pawn.Mode.BUS:
+			Game.current_match.eject(p)
+		elif p.mode == Pawn.Mode.SKYDIVE and p.height_above_ground() > 200.0:
 			p.global_position.y -= 6.0
 	p.select_slot(1)
 	await _wait(1.0)

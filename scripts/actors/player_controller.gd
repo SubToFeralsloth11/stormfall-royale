@@ -180,8 +180,8 @@ func _update_camera(delta: float) -> void:
 		return
 	var gliding := pawn.mode in [Pawn.Mode.SKYDIVE, Pawn.Mode.GLIDE]
 	var aiming := pawn.in_aim and not pawn.build_mode and not pawn.current_weapon().is_empty()
-	var dist := 3.2
-	var side := 0.75
+	var dist := 3.0
+	var side := 0.9
 	var height := 1.6 if not pawn.crouched else 1.15
 	var target_fov := 80.0
 	if aiming:
