@@ -153,6 +153,7 @@ func build(existing: ArrayMesh = null) -> ArrayMesh:
 static func vc_material(rough := 0.85, metal := 0.0) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
 	mat.roughness = rough
 	mat.metallic = metal
 	return mat

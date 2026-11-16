@@ -216,6 +216,7 @@ func _compute_colors() -> void:
 func _build_meshes() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
 	mat.roughness = 0.95
 	mat.metallic_specular = 0.2
 	var chunks := (N - 1) / CHUNK
@@ -324,6 +325,7 @@ func _build_roads() -> void:
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
 	mat.roughness = 0.8
 	var mi := MeshInstance3D.new()
 	mi.mesh = m

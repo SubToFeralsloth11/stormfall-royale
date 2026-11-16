@@ -13,6 +13,7 @@ run/max_fps=0
 
 Cfg="*res://scripts/core/cfg.gd"
 Sfx="*res://scripts/core/sfx.gd"
+Fx="*res://scripts/core/fx.gd"
 Game="*res://scripts/core/game.gd"
 
 [display]
