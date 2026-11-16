@@ -214,11 +214,10 @@ func _compute_colors() -> void:
 # ---------------------------------------------------------------- meshes
 
 func _build_meshes() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.vertex_color_is_srgb = true
-	mat.roughness = 0.95
-	mat.metallic_specular = 0.2
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/terrain.gdshader")
+	mat.set_shader_parameter("noise_tex", _noise_texture(0.02, 3, seed_hint()))
+	mat.set_shader_parameter("detail_tex", _noise_texture(0.08, 2, seed_hint() + 5))
 	var chunks := (N - 1) / CHUNK
 	for cz in chunks:
 		for cx in chunks:
@@ -236,6 +235,24 @@ func _build_meshes() -> void:
 					mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 				add_child(mi)
+
+
+func seed_hint() -> int:
+	return _noise.seed
+
+
+static func _noise_texture(freq: float, octaves: int, s: int) -> NoiseTexture2D:
+	var n := FastNoiseLite.new()
+	n.seed = s
+	n.frequency = freq
+	n.fractal_octaves = octaves
+	var t := NoiseTexture2D.new()
+	t.width = 256
+	t.height = 256
+	t.seamless = true
+	t.generate_mipmaps = true
+	t.noise = n
+	return t
 
 
 func _chunk_mesh(x0: int, z0: int, step: int) -> ArrayMesh:

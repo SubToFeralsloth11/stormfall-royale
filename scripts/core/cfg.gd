@@ -8,7 +8,7 @@ extends Node
 # --- World ---
 const MAP_SIZE := 3000.0            # island square, metres (storm phase 0 radius 1500 m)
 const WORLD_HALF := MAP_SIZE * 0.5
-const TERRAIN_STEP := 6.0           # heightmap cell size (m)
+const TERRAIN_STEP := 4.0           # heightmap cell size (m)
 const SEA_LEVEL := 0.0
 const TILE := 5.12                  # build grid width
 const LEVEL := 3.84                 # build grid height

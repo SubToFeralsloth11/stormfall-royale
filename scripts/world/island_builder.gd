@@ -33,6 +33,7 @@ func build_all() -> void:
 		_build_poi(i)
 	_scatter_nature()
 	_scatter_outskirts()
+	_scatter_details()
 	st.batcher.finalize()
 
 
@@ -428,6 +429,39 @@ func _prop(kind: String, p: Vector2, collide := true) -> void:
 			mat = M.METAL
 			yld = 4
 			vis = 400.0
+		"tent":
+			var bs := BoxShape3D.new()
+			bs.size = Vector3(3.0, 1.5, 3.6)
+			shape = bs
+			sxf = Transform3D(Basis.IDENTITY, Vector3(0, 0.75, 0))
+			hp = 150.0
+			mat = M.WOOD
+			yld = 5
+			vis = 500.0
+		"log":
+			var bs := BoxShape3D.new()
+			bs.size = Vector3(3.2, 0.7, 0.75)
+			shape = bs
+			sxf = Transform3D(Basis.IDENTITY, Vector3(1.6, 0.35, 0))
+			hp = 200.0
+			mat = M.WOOD
+			yld = 7
+			vis = 500.0
+		"fence":
+			var bs := BoxShape3D.new()
+			bs.size = Vector3(5.1, 1.1, 0.2)
+			shape = bs
+			sxf = Transform3D(Basis.IDENTITY, Vector3(2.5, 0.55, 0))
+			hp = 80.0
+			mat = M.WOOD
+			yld = 4
+			vis = 400.0
+		"campfire":
+			hp = 60.0
+			mat = M.WOOD
+			yld = 2
+			vis = 300.0
+			collide = false
 		"umbrella":
 			hp = 60.0
 			mat = M.WOOD
@@ -449,7 +483,7 @@ func _rock(p: Vector2, s: float, variant: int) -> void:
 
 
 func _scatter_nature() -> void:
-	var attempts := 9000
+	var attempts := 26000
 	var placed := 0
 	for k in attempts:
 		var p := Vector2(rng.randf_range(-1450, 1450), rng.randf_range(-1450, 1450))
@@ -480,7 +514,7 @@ func _scatter_nature() -> void:
 func _scatter_outskirts() -> void:
 	var made := 0
 	var tries := 0
-	while made < 22 and tries < 400:
+	while made < 70 and tries < 2500:
 		tries += 1
 		var p := Vector2(rng.randf_range(-1250, 1250), rng.randf_range(-1250, 1250))
 		var h := terrain.height_at(p.x, p.y)
@@ -490,6 +524,83 @@ func _scatter_outskirts() -> void:
 		if absf(level * Cfg.LEVEL - h) > 1.2:
 			continue
 		var before := piece_count
-		_house(_cell2(p), level, 2, 2, 1, M.WOOD)
+		var roll := rng.randf()
+		if roll < 0.45:
+			_house(_cell2(p), level, rng.randi_range(2, 3), 2, rng.randi_range(1, 2), M.WOOD)
+		elif roll < 0.6:
+			_watchtower(_cell2(p), level)
+		elif roll < 0.75:
+			_shed(_cell2(p), level, 2, 2, 1)
+		elif roll < 0.85:
+			_barn(_cell2(p), level)
+		else:
+			_camp(p)
+			made += 1
 		if piece_count > before:
 			made += 1
+
+
+## Tall wooden lookout: stacked floors with ramps and a roofed top.
+func _watchtower(cell: Vector2i, level: int) -> void:
+	if not _free(cell, 1, 1):
+		return
+	_claim(cell, 1, 1)
+	var h := rng.randi_range(3, 5)
+	var wood := Color(0.82, 0.62, 0.42)
+	for y in h:
+		_piece(K.WALL, Vector3i(cell.x, level + y, cell.y), 0, M.WOOD, wood, (1 << 1) | (1 << 4) | (1 << 7) if y < h - 1 else (1 << 4))
+		_piece(K.WALL, Vector3i(cell.x, level + y, cell.y + 1), 0, M.WOOD, wood, (1 << 4) | (1 << 7) | (1 << 1))
+		_piece(K.WALL, Vector3i(cell.x, level + y, cell.y), 1, M.WOOD, wood, (1 << 4) | (1 << 7) | (1 << 1))
+		_piece(K.WALL, Vector3i(cell.x + 1, level + y, cell.y), 1, M.WOOD, wood, (1 << 4) | (1 << 7) | (1 << 1))
+	_piece(K.RAMP, Vector3i(cell.x, level, cell.y), 0, M.WOOD, wood)
+	_piece(K.FLOOR, Vector3i(cell.x, level + h, cell.y), 0, M.WOOD, wood)
+	_piece(K.CONE, Vector3i(cell.x, level + h + 1, cell.y), 0, M.BRICK, _roofs[rng.randi() % _roofs.size()])
+	loot.add_chest(Cfg.cell_center(Vector3i(cell.x, level + h, cell.y)) + Vector3(0, 0.12, 0), 0.0)
+	chest_count += 1
+
+
+func _camp(p: Vector2) -> void:
+	_prop("campfire", p, false)
+	for k in rng.randi_range(2, 3):
+		var q := p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(5, 8)
+		_prop("tent", q, true)
+	_prop("log", p + Vector2(2.5, 1.5), true)
+	_prop("crate", p + Vector2(-3, 2), true)
+	var h := terrain.height_at(p.x + 1.5, p.y - 2.5)
+	loot.spawn_floor_loot(Vector3(p.x + 1.5, h, p.y - 2.5))
+	if rng.randf() < 0.6:
+		loot.add_chest(Vector3(p.x - 2, terrain.height_at(p.x - 2, p.y - 3), p.y - 3), rng.randf() * TAU)
+		chest_count += 1
+
+
+## Ground cover so the countryside never looks empty: grass tufts and flower patches
+## (instanced, no collision), plus fallen logs and fences along fields.
+func _scatter_details() -> void:
+	var mat := MeshBuilder.vc_material(0.95)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var grass := PropMeshes.get_mesh("grass", 0)
+	var grass2 := PropMeshes.get_mesh("grass", 1)
+	for k in 70000:
+		var p := Vector2(rng.randf_range(-1450, 1450), rng.randf_range(-1450, 1450))
+		var h := terrain.height_at(p.x, p.y)
+		if h < 2.8 or h > 95.0 or _occupied.has(_cell2(p)):
+			continue
+		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.8, 1.5)), Vector3(p.x, h - 0.05, p.y))
+		if rng.randf() < 0.1:
+			st.batcher.add("flower%d" % (k % 4), PropMeshes.get_mesh("flower", k % 4), mat, xf, Color.WHITE, 160.0, false)
+		else:
+			st.batcher.add("grass" if k % 2 == 0 else "grass2", grass if k % 2 == 0 else grass2, mat, xf, Color.WHITE, 170.0, false)
+	for k in 500:
+		var p := Vector2(rng.randf_range(-1400, 1400), rng.randf_range(-1400, 1400))
+		if terrain.height_at(p.x, p.y) < 3.0 or terrain.poi_at(p) >= 0:
+			continue
+		if k % 3 != 0:
+			_prop("log", p, true)
+		else:
+			_rock(p, rng.randf_range(0.8, 1.6), rng.randi() % 3)
+	# fence lines around farm fields
+	var farm: Vector2 = Terrain.POIS[3].pos
+	for k in 40:
+		var a := TAU * k / 40.0
+		var p := farm + Vector2.from_angle(a) * 150.0
+		_prop("fence", p, true)

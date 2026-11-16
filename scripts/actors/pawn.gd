@@ -317,6 +317,8 @@ func _try_mantle(forced := false) -> void:
 
 func _land() -> void:
 	var fall := _fall_peak - global_position.y
+	if fall > 1.0:
+		rig.land_t = 0.0
 	if fall > 1.5 and (is_player or game.near_player(global_position, 40.0)):
 		Sfx.play_at("land", global_position)
 	if fall > Cfg.FALL_SAFE:
@@ -588,9 +590,9 @@ func _combat(delta: float) -> void:
 		rig.heal_t = -1.0
 	# pickaxe swing anim
 	if _swing_t >= 0.0:
-		_swing_t += delta / 0.55
+		_swing_t += delta / 0.5
 		rig.swing_t = _swing_t
-		if _swing_t >= 0.45 and not _swing_hit_done:
+		if _swing_t >= 0.44 and not _swing_hit_done:
 			_swing_hit_done = true
 			_pickaxe_hit()
 		if _swing_t >= 1.0:
@@ -607,10 +609,11 @@ func _combat(delta: float) -> void:
 	if not held or _equip_cd > 0.0:
 		return
 	if slot == 0 or current_item().is_empty():
-		if _swing_cd <= 0.0 and _swing_t < 0.0:
+		if _swing_cd <= 0.0 and (_swing_t < 0.0 or _swing_t > 0.78):
 			_swing_t = 0.0
 			_swing_hit_done = false
-			_swing_cd = 0.5
+			_swing_cd = 0.46
+			rig.swing_combo += 1
 			_stop_emote()
 			if is_player or game.near_player(global_position, 25.0):
 				Sfx.play_at("swing", global_position)
@@ -943,6 +946,7 @@ func _drive_rig(delta: float) -> void:
 	rig.sprinting = Vector2(velocity.x, velocity.z).length() > Cfg.RUN_SPEED + 0.5
 	rig.crouching = crouched and not _sliding
 	rig.aim_pitch = pitch
+	rig.ads = in_aim and not current_weapon().is_empty() and not build_mode
 	rig.dive = dive
 	match mode:
 		Mode.SKYDIVE: rig.pose = CharacterRig.Pose.SKYDIVE

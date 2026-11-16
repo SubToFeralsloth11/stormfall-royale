@@ -58,6 +58,8 @@ func _ready() -> void:
 		[Vector3(c.x - 60, 60, c.y + 140), Vector3(c.x, 10, c.y)],
 		[Vector3(0, 700, 1500), Vector3(0, 0, 0)],
 		[Vector3(Terrain.POIS[1].pos.x + 50, 40, Terrain.POIS[1].pos.y + 90), Vector3(Terrain.POIS[1].pos.x, 20, Terrain.POIS[1].pos.y)],
+		[Vector3(500, terrain.height_at(500, 150) + 3, 150), Vector3(560, terrain.height_at(560, 100) + 1, 100)],
+		[Vector3(-500, terrain.height_at(-500, -250) + 30, -250), Vector3(-600, terrain.height_at(-600, -350), -350)],
 	]
 	_next_shot(0)
 

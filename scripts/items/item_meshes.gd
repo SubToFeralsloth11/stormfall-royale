@@ -14,6 +14,7 @@ static func get_mesh(id: String, rarity := 0) -> ArrayMesh:
 	if _cache.has(key):
 		return _cache[key]
 	var mb := MeshBuilder.new()
+	MeshBuilder.detail = 1.7
 	var accent: Color = Cfg.RARITY_COLORS[clampi(rarity, 0, 4)]
 	match id:
 		"ar": _ar(mb, accent)
@@ -35,6 +36,7 @@ static func get_mesh(id: String, rarity := 0) -> ArrayMesh:
 		"bus": _bus(mb)
 		"balloon": _balloon(mb)
 		"mats": _mats(mb, rarity)
+	MeshBuilder.detail = 1.0
 	var m := mb.build()
 	_cache[key] = m
 	return m

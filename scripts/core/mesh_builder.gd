@@ -11,6 +11,8 @@ var weights := PackedFloat32Array()
 var skinned := false
 var bone := 0                 # current bone for appended vertices
 var xf := Transform3D.IDENTITY
+## Global tessellation multiplier for curved primitives (set while building a mesh set).
+static var detail := 1.0
 
 
 func _add(v: Vector3, n: Vector3, c: Color) -> void:
@@ -56,6 +58,7 @@ func box(center: Vector3, size: Vector3, col: Color) -> void:
 
 ## Tapered cylinder along +Y from y0 to y1 with radii r0,r1; smooth normals.
 func cylinder(base: Vector3, height: float, r0: float, r1: float, seg: int, col: Color, caps := true, col_top: Variant = null) -> void:
+	seg = maxi(3, roundi(seg * detail))
 	var top := base + Vector3(0, height, 0)
 	var slope := (r0 - r1) / maxf(height, 0.001)
 	for i in seg:
@@ -82,6 +85,8 @@ func cylinder(base: Vector3, height: float, r0: float, r1: float, seg: int, col:
 
 ## Low-poly UV sphere (ellipsoid via scale) with smooth normals.
 func sphere(center: Vector3, radius: Vector3, rings: int, seg: int, col: Color, y_from := 0.0, y_to := 1.0) -> void:
+	rings = maxi(1, roundi(rings * detail))
+	seg = maxi(3, roundi(seg * detail))
 	for r in rings:
 		var v0 := lerpf(y_from, y_to, float(r) / rings)
 		var v1 := lerpf(y_from, y_to, float(r + 1) / rings)

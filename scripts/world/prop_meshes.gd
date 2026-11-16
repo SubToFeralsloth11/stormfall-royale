@@ -10,6 +10,7 @@ static func get_mesh(kind: String, variant := 0) -> ArrayMesh:
 	if _cache.has(key):
 		return _cache[key]
 	var mb := MeshBuilder.new()
+	MeshBuilder.detail = 1.6
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(key)
 	match kind:
@@ -29,6 +30,13 @@ static func get_mesh(kind: String, variant := 0) -> ArrayMesh:
 		"stadium_ring": _stadium_ring(mb, variant)
 		"umbrella": _umbrella(mb, rng)
 		"lamp": _lamp(mb)
+		"grass": _grass(mb, rng)
+		"flower": _flower(mb, rng, variant)
+		"tent": _tent(mb, variant)
+		"log": _log(mb)
+		"fence": _fence(mb)
+		"campfire": _campfire(mb)
+	MeshBuilder.detail = 1.0
 	var m := mb.build()
 	_cache[key] = m
 	return m
@@ -224,3 +232,70 @@ static func _lamp(mb: MeshBuilder) -> void:
 	mb.cylinder(Vector3.ZERO, 6.0, 0.12, 0.09, 6, Color(0.25, 0.27, 0.3))
 	mb.limb(Vector3(0, 6.0, 0), Vector3(1.2, 6.3, 0), 0.08, 0.08, Color(0.25, 0.27, 0.3), 5)
 	mb.sphere(Vector3(1.25, 6.15, 0), Vector3(0.35, 0.2, 0.35), 3, 8, Color(1, 0.95, 0.75))
+
+
+static func _grass(mb: MeshBuilder, rng: RandomNumberGenerator) -> void:
+	var base := Color(0.3, 0.6, 0.2)
+	for i in 7:
+		var a := rng.randf() * TAU
+		var r := rng.randf() * 0.25
+		var p := Vector3(cos(a) * r, 0, sin(a) * r)
+		var lean := Vector3(rng.randf_range(-0.25, 0.25), 0, rng.randf_range(-0.25, 0.25))
+		var h := rng.randf_range(0.35, 0.7)
+		var side := Vector3(cos(a + 1.3), 0, sin(a + 1.3)) * 0.05
+		var c := base.lerp(Color(0.5, 0.78, 0.3), rng.randf())
+		mb.tri(p - side, p + Vector3(0, h, 0) + lean, p + side, c)
+		mb.tri(p + side, p + Vector3(0, h, 0) + lean, p - side, c.darkened(0.15))
+
+
+static func _flower(mb: MeshBuilder, rng: RandomNumberGenerator, variant: int) -> void:
+	var cols := [Color(1.0, 0.85, 0.2), Color(1.0, 0.45, 0.6), Color(0.6, 0.5, 1.0), Color(1, 1, 1)]
+	for i in 5:
+		var p := Vector3(rng.randf_range(-0.5, 0.5), 0, rng.randf_range(-0.5, 0.5))
+		var h := rng.randf_range(0.25, 0.45)
+		mb.cylinder(p, h, 0.012, 0.012, 3, Color(0.3, 0.6, 0.2), false)
+		mb.sphere(p + Vector3(0, h, 0), Vector3(0.07, 0.04, 0.07), 2, 6, cols[(variant + i) % cols.size()])
+
+
+static func _tent(mb: MeshBuilder, variant: int) -> void:
+	var c: Color = [Color(0.95, 0.5, 0.2), Color(0.3, 0.6, 0.9), Color(0.4, 0.7, 0.35)][variant % 3]
+	var seg := 10
+	for i in seg:
+		var a0 := PI * i / seg
+		var a1 := PI * (i + 1) / seg
+		var p0 := Vector3(cos(a0) * 1.5, sin(a0) * 1.6, 0)
+		var p1 := Vector3(cos(a1) * 1.5, sin(a1) * 1.6, 0)
+		var f := Vector3(0, 0, -1.8)
+		var b := Vector3(0, 0, 1.8)
+		var n0 := Vector3(cos(a0), sin(a0), 0)
+		var n1 := Vector3(cos(a1), sin(a1), 0)
+		var col := c if i % 2 == 0 else c.lightened(0.1)
+		mb._add(p0 + f, n0, col); mb._add(p1 + f, n1, col); mb._add(p0 + b, n0, col)
+		mb._add(p0 + b, n0, col); mb._add(p1 + f, n1, col); mb._add(p1 + b, n1, col)
+		mb.tri(Vector3(0, 0, 1.8), p1 + b, p0 + b, c.darkened(0.2))
+	mb.box(Vector3(0, 0.02, 0), Vector3(3.0, 0.04, 3.6), Color(0.35, 0.3, 0.25))
+
+
+static func _log(mb: MeshBuilder) -> void:
+	var old := mb.xf
+	mb.xf = Transform3D(Basis(Vector3.FORWARD, PI * 0.5), Vector3(1.6, 0.35, 0))
+	mb.cylinder(Vector3.ZERO, 3.2, 0.38, 0.34, 9, Color(0.48, 0.32, 0.2), true, Color(0.85, 0.7, 0.45))
+	mb.xf = old
+
+
+static func _fence(mb: MeshBuilder) -> void:
+	var w := Color(0.82, 0.68, 0.48)
+	for x: float in [0.0, 2.5, 5.0]:
+		mb.box(Vector3(x, 0.55, 0), Vector3(0.14, 1.1, 0.14), w.darkened(0.1))
+	for y: float in [0.45, 0.85]:
+		mb.box(Vector3(2.5, y, 0), Vector3(5.1, 0.12, 0.05), w)
+
+
+static func _campfire(mb: MeshBuilder) -> void:
+	for i in 7:
+		var a := TAU * i / 7.0
+		mb.sphere(Vector3(cos(a) * 0.55, 0.08, sin(a) * 0.55), Vector3(0.16, 0.12, 0.16), 2, 6, Color(0.5, 0.5, 0.5))
+	for i in 4:
+		var a := TAU * i / 4.0 + 0.4
+		mb.limb(Vector3(cos(a) * 0.35, 0.05, sin(a) * 0.35), Vector3(0, 0.45, 0), 0.06, 0.04, Color(0.45, 0.3, 0.18), 6)
+	mb.cylinder(Vector3(0, 0.05, 0), 0.55, 0.22, 0.0, 7, Color(1.0, 0.55, 0.15))
