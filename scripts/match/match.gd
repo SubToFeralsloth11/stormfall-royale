@@ -137,8 +137,27 @@ func camera_shake(amount: float) -> void:
 	controller.shake = maxf(controller.shake, amount)
 
 
-func player_damaged(_attacker: Pawn, _amount: float) -> void:
-	controller.damage_flash = 1.0
+func player_damaged(_attacker: Pawn, amount: float) -> void:
+	controller.damage_taken(amount)
+
+
+## Everything the HUD needs that isn't on the pawn.
+func hud_info() -> Dictionary:
+	return {
+		"alive": alive_count(),
+		"phase": -1, "storm_label": "", "storm_time": 0.0,
+		"storm_center": Vector2.ZERO, "storm_radius": 99999.0,
+		"next_center": Vector2.ZERO, "next_radius": 99999.0,
+		"bus_path": [], "in_storm": false,
+	}
+
+
+func alive_count() -> int:
+	var n := 0
+	for pw in pawns:
+		if pw.is_alive():
+			n += 1
+	return n
 
 
 ## Harvest weak spot: first hit spawns one, hitting near it crits and moves it.
